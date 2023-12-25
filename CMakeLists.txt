@@ -25,8 +25,14 @@ target_link_libraries(test ${OpenCV_LIBS})
 add_executable(filter-basic filter-basic.cpp)
 target_link_libraries(filter-basic ${OpenCV_LIBS})
 
+add_executable(makeborder makeborder.cpp)
+target_link_libraries(makeborder ${OpenCV_LIBS})
+
+add_executable(filter2Ddemo filter2Ddemo.cpp)
+target_link_libraries(filter2Ddemo ${OpenCV_LIBS})
+
 add_executable(color color.cpp)
 target_link_libraries(color ${OpenCV_LIBS})
 
-add_executable(blkproc blkproc.cpp)
+add_executable(blkproc blkproc.cpp jpgheaders.cpp)
 target_link_libraries(blkproc ${OpenCV_LIBS})
