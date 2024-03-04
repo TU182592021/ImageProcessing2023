@@ -6,6 +6,7 @@
 #include "qtables.hpp"
 #include "tools.hpp"
 #include "jpgheaders.hpp"
+#include "time.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -39,7 +40,7 @@ int main(int argc, char *argv[])
   create_qtable(0, QF, &qtables[0][0]);
   create_qtable(1, QF, &qtables[1][0]);
 
-  int YCCtype = YUV444;
+  int YCCtype = YUV411;
   bitstream enc;
   create_mainheader(rgb.cols, rgb.rows, rgb.channels(), qtables[0], qtables[1], YCCtype, enc);
 
@@ -52,6 +53,8 @@ int main(int argc, char *argv[])
   std::vector<cv::Mat> buf_f(3);
 
   // ------ ENCODE
+  double dct2_time = 0.0;
+  double quantize_time = 0.0;
   for (size_t c = 0; c < buf.size(); ++c)
   {
     int Hl = (YCC_HV[YCCtype][0] & 0xF0) >> 4;
@@ -60,13 +63,24 @@ int main(int argc, char *argv[])
     {
       cv::resize(buf[c], buf[c], cv::Size(), 1.0 / Hl, 1.0 / Vl, cv::INTER_AREA);
     }
-    buf[c].convertTo(buf_f[c], CV_32F);               // 浮動小数点に変換
-    buf_f[c] -= 128.0;                                // 全画素の値から128を引く(DCレベルシフト)
-    blkproc(buf_f[c], blk::dct2);                     // 順方向のDCT
-    blkproc(buf_f[c], blk::quantize, qtables[c > 0]); // 量子化
+    buf[c].convertTo(buf_f[c], CV_32F); // 浮動小数点に変換
+    buf_f[c] -= 128.0;
+    auto s0 = time_start(); // 全画素の値から128を引く(DCレベルシフト)
+    blkproc(buf_f[c], blk::dct2);
+    auto d0 = time_stop(s0);
+    auto s1 = time_start();                           // 順方向のDCT➀
+    blkproc(buf_f[c], blk::quantize, qtables[c > 0]); // 量子化⓶
+    auto d1 = time_stop(s1);
+    dct2_time += static_cast<double>(d0) / 1000.0;
+    quantize_time += static_cast<double>(d1) / 1000.0;
   }
-  // ハフマン符号化
+  printf("dct2_time takes %f[ms]\nquantize_time takes %f[ms]\n", dct2_time, quantize_time);
+  // ハフマン符号化⓷
+  auto s2 = time_start();
   entropy_coding(buf_f, YCCtype, enc);
+  auto d2 = time_stop(s2);
+  double entropy_coding_time = static_cast<double>(d2) / 1000.0;
+  printf("entropy_coding_time takes %f[ms]\n", entropy_coding_time);
   auto codestream = enc.finalize();
 
   FILE *fp = fopen("tmp.jpg", "wb");
